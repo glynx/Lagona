@@ -1,0 +1,20 @@
+== Lagona
+
+Lagone is a flexible Homebus Project, it includes:
+* A solid multi-master Protocol Stack
+* Compatible with multiple physical layers (currently RS485 and RFM12 supported)
+* Module-based system makes it possible to put excaly the things you need on the units
+* 
+
+=== Current Status
+
+The project just started, we got a few developers and there was much Code developed in the 
+last weeks. We have started prototyping with the first modules and it seems to go on well.
+
+Currently it might not be easy to get the things running with your own hardware but
+in the next time we will upload the layout files and schematics for our modules so you
+could take a look at them. Also there will be a documentation for that stuff soon.
+
+== TODO
+
+Too much stuff, sorry no list yet ;)
