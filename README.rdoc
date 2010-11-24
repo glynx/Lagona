@@ -4,7 +4,6 @@ Lagone is a flexible Homebus Project, it includes:
 * A solid multi-master Protocol Stack
 * Compatible with multiple physical layers (currently RS485 and RFM12 supported)
 * Module-based system makes it possible to put excaly the things you need on the units
-* 
 
 === Current Status
 
