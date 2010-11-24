@@ -1,4 +1,0 @@
-PROJECT(projekt433)
-
-ADD_EXECUTABLE(projekt433 main.cpp)
-
