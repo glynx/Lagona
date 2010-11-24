@@ -1,0 +1,14 @@
+Projekt433.kdev4
+CMakeLists.txt
+main.eep
+main.elf
+main.hex
+main.lss
+main.lst
+main.map
+main.o
+main.sym
+build/
+includes/backup/
+includes/temp/
+conf/temp/
