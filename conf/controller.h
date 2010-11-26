@@ -5,7 +5,6 @@
 
 //##################################### ATMEGA 48 #############################################
 
-
 //################### UART #######################
 #define defRXEN		RXEN0	//Default RX enable
 #define defTXEN		TXEN0	//Default TX enable
@@ -23,6 +22,20 @@
 #define defUCSRA	UCSR0A
 #define defUDRE		UDRE0
 #define defUARTVEC	USART_RX_vect //Default Uart IRQ Vektor
+#define defPE		PE
+#define defFE		FE
+#define defDOR		DOR
+#define defU2X		U2X
+#define defMPCM		MPCM
+#define defUARTTXTEV USART_TX_vect
+#define defRXCIE	RXCIE0
+#define defRXB8		RXB8
+#define defTXB8		TXB8
+#define defUMSEL	UMSEL
+#define defUPM0		UPM0
+#define defUPM1		UPM1
+#define defUSBS		USBS
+
 //################### TIME #######################
 
 #define defTCCRB	TCCR0B	//Default Timer Counter Control Register
@@ -62,8 +75,23 @@
 #define defUCSRA = UCSRA
 #define defUDRE = UDRE
 #define defUARTVEC	USART_RXC_vect //Default Uart IRQ Vektor
+#define defPE		PE
+#define defFE		FE
+#define defDOR		DOR
+#define defU2X		U2X
+#define defMPCM		MPCM
+#define defUARTTXTEV USART_TXC_vect
+#define defTXCIE	TXCIE
+#define defRXB8		RXB8
+#define defTXB8		TXB8
+#define defUMSEL	UMSEL
+#define defUPM0		UPM0
+#define defUPM1		UPM1
+#define defUSBS		USBS
+
 //################### TIME #######################
 
+#define defTCCRA	TCCR1A   //Default Timer Counter Control Register
 #define defTCCRB	TCCR1B	//Default Timer Counter Control Register
 #define defCS0		CS10	//Default Counter divider Bit0
 #define defCS1		CS11	//Default Counter divider Bit1
@@ -101,6 +129,20 @@
 #define defUCSRA	UCSRA
 #define defUDRE		UDRE
 #define defUARTVEC	USART_RXC_vect //Default Uart IRQ Vektor
+#define defPE		PE
+#define defFE		FE
+#define defDOR		DOR
+#define defU2X		U2X
+#define defMPCM		MPCM
+#define defUARTTXTEV USART_TXC_vect
+#define defRXCIE	RXCIE
+#define defRXB8		RXB8
+#define defTXB8		TXB8
+#define defUMSEL	UMSEL
+#define defUPM0		UPM0
+#define defUPM1		UPM1
+#define defUSBS		USBS
+
 //################### TIME #######################
 
 #define defTCCRB	TCCR0	//Default Timer Counter Control Register

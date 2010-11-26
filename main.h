@@ -1,25 +1,34 @@
 #ifndef __MAIN_H_
 #define __MAIN_H_
 
+#include <avr/io.h>
+
 //Einstellungen
 
 
 
 //funktionen
-#define uart 1
+#define uart 0
 #define rgb 0
-#define time 1
-#define funk 1
-#define interface 1
+#define time 0
+#define funk 0
+#define interface 0
+#define rs485 1
 
 #if defined (__AVR_ATmega16__)
-unsigned char device_mac = 1;
-#define onoff 1
+	//unsigned char device_mac = 1;
+	#define onoff 0
 #else
-unsigned char device_mac = 2;
+//unsigned char device_mac = 2;
 #endif
 
 #define testing 1
+
+/*****
+ * Prototypes
+ *****/
+
+void critical_error(uint8_t err);
 
 
 

@@ -1,34 +1,46 @@
-#include <main.h>
 #include <avr/pgmspace.h>
 #include <avr/io.h>
 #include <avr/interrupt.h>
-#include <conf/controller.h>
+#include "main.h"
+#include "conf/controller.h"
+
+#if rs485 == 1
+#include "includes/rs485/rs485.h"
+#endif
+
 #if uart == 1
-#include <includes/uart.c>
+#include "includes/uart.c"
 #endif
 
 #if funk == 1
-#include <includes/funk.c>
-#include <includes/funk_tx.c>
+#include "includes/funk.c"
+#include "includes/funk_tx.c"
 char pfb = 0;
 #endif
 
 #if time == 1
-#include <includes/time.c>
+#include "includes/time.c"
 #endif
 
 #if interface == 1
-#include <includes/interface.c>
+#include "includes/interface.c"
 #endif
 
 #if onoff == 1
-#include <includes/onoff.c>
+#include "includes/onoff.c"
 #endif
 
+/*****
+ * Status
+ *****/
+typedef struct main_status {
+	uint8_t rest:8;
+} MAIN_STATUS;
+MAIN_STATUS m_status;
 
 int main(void)
 {
-  uart_init();
+  //uart_init();
 #if funk == 1
   funk_init();
   //DDR_IRQ &= ~(1 << RF12_IRQ);
@@ -47,7 +59,7 @@ int main(void)
     onoff_init();
     onoff_dev(0, 1);
 #endif
-  uart_send_string("\n\r");
+ //uart_send_string("\n\r");
   sei();
 
     
@@ -101,4 +113,15 @@ int main(void)
 
 
   }
+}
+
+/*
+ * Call this when a unrecoverable error occurs.
+ * This will halt the whole program.
+ */
+void critical_error(uint8_t err) {
+	cli(); // No more interrupts
+	while(1) {
+		// TODO: Error report? (LED i.e.)
+	}
 }
