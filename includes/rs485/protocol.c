@@ -89,6 +89,7 @@ void rs485_register_error_cb(void (*cb)(uint8_t));
 
 void rs485_stop_sending() {
 	rs485_status.sending = 0;
+	rs485_status.package_sent = 1;
 	rs485_free_package();
 	rs485_wait_for_address();
 }
@@ -214,6 +215,8 @@ void rs485_package_received(RS485_PACKAGE* package) {
 				// TODO: Send NACK
 			}
 			free(package); // Dropped
+		} else {
+			rs485_status.package_received = 1;
 		}
 	}
 }
@@ -504,14 +507,16 @@ uint8_t rs485_last_package_sent_successfully() {
  *****/
 
 /*
- * Given function is called when a package was received
+ * Given function is called when a package was received successfully
  */
 void rs485_register_package_received_cb(void (*cb)(void)) {
 	rs485_package_received_cb = cb;
 }
 
 /*
- * Given function is called when a package was sent
+ * Given function is called when a package was sent. Note that this
+ * doesn't mean that the package was successfully sent.
+ * To determine that, use rs485_last_package_sent_successfully();
  */
 void rs485_register_package_sent_cb(void (*cb)(void)) {
 	rs485_package_sent_cb = cb;
