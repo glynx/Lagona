@@ -177,7 +177,12 @@ void rs485_send_package(RS485_PACKAGE* package) {
 		tx_package->size = sizeof(RS485_HEADER);
 		if(package->package.header.length) {
 			 tx_package->size += 2 + package->package.header.length;
+#ifdef USE_RS485_CRC_CHECKSUM
 			 package->package.body.checksum = crc_calculate_bytes(package->package.body.data, package->package.header.length, RS485_CRC16_START, RS485_CRC16_POLY);
+#else
+#warning	Clients with CRC checksum disabled may only send packages without data
+			 critical_error(ERR_SEND_WITHOUT_CHECKSUM);
+#endif
 		}
 		rs485_status.sending = 1;
 		tx_delay = 0;
@@ -223,6 +228,7 @@ void rs485_package_received(RS485_PACKAGE* package) {
 	}
 
 	if(!handled) {
+#ifdef RS485_USE_CRC_CHECKSUM
 		uint16_t crc;
 		crc = crc_calculate_bytes(package->package.body.data, package->package.header.length, RS485_CRC16_START, RS485_CRC16_POLY);
 		crc = crc_calculate_bytes((uint8_t*)&(package->package.body.checksum), 2, crc, RS485_CRC16_POLY);
@@ -233,6 +239,7 @@ void rs485_package_received(RS485_PACKAGE* package) {
 			}
 			return;
 		}
+#endif
 
 		if(package->package.header.flags.flags.ack_req) {
 			rs485_send_ack(package->package.header.origin, 1);

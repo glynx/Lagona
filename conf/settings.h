@@ -15,6 +15,7 @@
 
 //#define USE_DOUBLE_LINKED_LISTS
 //#define USE_RS485_ADDRESS_GROUPS
+#define USE_RS485_CRC_CHECKSUM
 
 /*
  * System wide configurations
