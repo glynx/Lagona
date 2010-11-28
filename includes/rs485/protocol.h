@@ -58,6 +58,25 @@ typedef struct rs485_travelling_package {
 	uint8_t size;
 } RS485_TRAVELLING_PACKAGE;
 
+/*
+ * UART callbacks
+ */
+void rs485_uart_receive_error(uint8_t error);
+void rs485_uart_address_received(uint8_t addr);
+void rs485_uart_received(uint8_t byte);
+void rs485_uart_sent();
+
+typedef uint8_t RS485_ADDRESS;
 #define RS485_DEFAULT_ADDRESS		0xFE
+#define RS485_MASTER_ADDRESS		0x00
+#define RS485_BROADCAST_ADDRESS		0xFF
+uint8_t rs485_address_equals(void* a1, void* a2);
+
+#define RS485_CRC16_POLY 			0x04C1
+#define RS485_CRC16_START			0xFFFF
+
+/* Timeouts/Delays */
+#define	RS485_RX_TIMEOUT			5	// 0.5 ms
+#define RS485_ACK_TIMEOUT			10  // 1ms
 
 #endif /* PROTOCOL_H_ */

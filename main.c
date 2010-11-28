@@ -3,6 +3,7 @@
 #include <avr/interrupt.h>
 #include "main.h"
 #include "conf/controller.h"
+#include "includes/security/rand.h"
 
 #if rs485 == 1
 #include "includes/rs485/rs485.h"
@@ -40,6 +41,7 @@ MAIN_STATUS m_status;
 
 int main(void)
 {
+	rand_init();
   //uart_init();
 #if funk == 1
   funk_init();

@@ -5,6 +5,8 @@
 
 //Einstellungen
 
+/* Length of a tick in us */
+#define SYSTEM_TICK_LENGTH	100; // 0.1 ms
 
 
 //funktionen

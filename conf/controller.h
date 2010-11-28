@@ -59,21 +59,21 @@
 
 
 //################### UART #######################
-#define defRXEN = RXEN		//Default RX enable
-#define defTXEN = TXEN  	//Default TX enable
-#define defRXCIE = RXCIE 	//Default RX interrupt enable
-#define defUCSRB = UCSRB		//Default Uart Status Register B
-#define defUCSRC = UCSRC		//Default Uart Status Register C
-#define defURSEL = URSEL	//Default Register Select
-#define defSETURSEL = (1<<defURSEL)
-#define defUCSZ0 = UCSZ0	//Default Uart Character Size 0
-#define defUCSZ1 = UCSZ1	//Default Uart Character Size 1
-#define defUCSZ2 = UCSZ2	//Default Uart Character Size 2
-#define defUBRRH = UBRRH	//Default Uart Baudrate Register High
-#define defUBRRL = UBRRL	//Default Uart Baudrate Register Low
-#define defUDR = UDR
-#define defUCSRA = UCSRA
-#define defUDRE = UDRE
+#define defRXEN RXEN		//Default RX enable
+#define defTXEN TXEN  	//Default TX enable
+#define defRXCIE RXCIE 	//Default RX interrupt enable
+#define defUCSRB UCSRB		//Default Uart Status Register B
+#define defUCSRC UCSRC		//Default Uart Status Register C
+#define defURSEL URSEL	//Default Register Select
+#define defSETURSEL (1<<defURSEL)
+#define defUCSZ0 UCSZ0	//Default Uart Character Size 0
+#define defUCSZ1 UCSZ1	//Default Uart Character Size 1
+#define defUCSZ2 UCSZ2	//Default Uart Character Size 2
+#define defUBRRH UBRRH	//Default Uart Baudrate Register High
+#define defUBRRL UBRRL	//Default Uart Baudrate Register Low
+#define defUDR UDR
+#define defUCSRA UCSRA
+#define defUDRE UDRE
 #define defUARTVEC	USART_RXC_vect //Default Uart IRQ Vektor
 #define defPE		PE
 #define defFE		FE

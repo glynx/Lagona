@@ -12,6 +12,9 @@
 #include "uart.h"
 #include "../../conf/errors.h"
 #include "../data/fifo.h"
+#include "../data/list.h"
+#include "../security/crc.h"
+#include "../security/rand.h"
 
 typedef struct status {
 	uint8_t addressed:1;
@@ -27,8 +30,6 @@ STATUS rs485_status;
 
 FIFO* rx_buffer;			/* Buffer for received packages */
 
-uint16_t address;			/* Our bus address */
-
 uint8_t tx_delay = 0;		/* Ticks after which transmit is tried */
 uint8_t tx_retries = 0;		/* Number of retries current tx package already had */
 uint8_t rx_timeout = 0;		/* Ticks to wait until receiving package will be dropped */
@@ -38,6 +39,9 @@ uint8_t last_error = ERR_NONE;
 RS485_TRAVELLING_PACKAGE* tx_package;		/* The currently sent package */
 RS485_TRAVELLING_PACKAGE* rx_package;		/* The currently received package */
 
+LIST* groups;
+RS485_ADDRESS address;
+// TODO: Address = broadcast address <=> receive all
 
 /*****
  * Callbacks
@@ -61,6 +65,7 @@ void rs485_free_package();
 RS485_PACKAGE* rs485_next_package();
 void rs485_send_ack(uint16_t dest, uint8_t ack);
 
+void rs485_uart_receive_error(uint8_t error);
 void rs485_uart_address_received(uint8_t addr);
 void rs485_uart_received(uint8_t byte);
 void rs485_send_byte();
@@ -70,7 +75,8 @@ void rs485_wait_for_address();
 void rs485_addressed();
 void rs485_proccess(uint8_t ticks_passed);
 
-void rs485_set_address(uint16_t addr);
+uint8_t rs485_add_group(RS485_ADDRESS addr);
+void rs485_remove_group(RS485_ADDRESS addr);
 void rs485_init();
 uint8_t rs485_is_sending();
 uint8_t rs485_is_receiving();
@@ -83,8 +89,6 @@ void rs485_register_package_sent_cb(void (*cb)(void));
 void rs485_register_error_cb(void (*cb)(uint8_t));
 
 // TODO: Before sending, check if the bus is busy
-// TODO: CRC calculation and check
-// TODO: Address and address group managing
 
 /*****
  * RXTX control
@@ -108,15 +112,14 @@ void rs485_postpone_sending(uint8_t ticks) {
 				tx_retries++;
 				tx_package->position = 0;
 				if(tx_delay == 0xFF) {
-					// TODO: Random amount of time
-					tx_delay = 100; // Retry after 100 ticks
+					tx_delay = rand_in(1, 250); // Retry after 2 to 250 ticks, thats 0 to 25 ms
 				} else {
 					if(ticks == 0) {
 						// Resend immediately
 						rs485_send_byte();
 					}
-						// Resend later
-						tx_delay = ticks;
+					// Resend later
+					tx_delay = ticks;
 				}
 			} else {
 				/* Package not sent successfully */
@@ -165,6 +168,7 @@ void rs485_send_package(RS485_PACKAGE* package) {
 		tx_package->size = sizeof(RS485_HEADER);
 		if(package->package.header.length) {
 			 tx_package->size += 2 + package->package.header.length;
+			 package->package.body.checksum = crc_calculate_bytes(package->package.body.data, package->package.header.length, RS485_CRC16_START, RS485_CRC16_POLY);
 		}
 		rs485_status.sending = 1;
 		tx_delay = 0;
@@ -210,6 +214,17 @@ void rs485_package_received(RS485_PACKAGE* package) {
 	}
 
 	if(!handled) {
+		uint16_t crc;
+		crc = crc_calculate_bytes(package->package.body.data, package->package.header.length, RS485_CRC16_START, RS485_CRC16_POLY);
+		crc = crc_calculate_bytes((uint8_t*)&(package->package.body.checksum), 2, crc, RS485_CRC16_POLY);
+		if(crc) {
+			/* CRC invalid */
+			if(package->package.header.flags.flags.ack_req) {
+				rs485_send_ack(package->package.header.origin, 0);
+			}
+			return;
+		}
+
 		if(package->package.header.flags.flags.ack_req) {
 			rs485_send_ack(package->package.header.origin, 1);
 		}
@@ -271,6 +286,15 @@ void rs485_send_ack(uint16_t dest, uint8_t ack) {
  *****/
 
 /*
+ * Called when the UART detected an error while receiving a byte.
+ * Receiving of the package is then cancelled.
+ */
+void rs485_uart_receive_error(uint8_t error) {
+	rs485_cancel_receiving();
+	last_error = error;
+}
+
+/*
  * Called when a byte marked with address type is received from
  * UART. This should indicate the beginning of a new incoming transmission.
  */
@@ -283,7 +307,10 @@ void rs485_uart_address_received(uint8_t addr) {
 		if((!rs485_status.sending || rs485_status.waiting_for_ack) && !rs485_status.receiving) {
 			/* When we are waiting for a packet, either because we are idle or we
 			 * expect an ack, the address is the beginning of a new package to be received */
-			// TODO: Address check
+			if(address != RS485_BROADCAST_ADDRESS && addr != address && !list_contains_data(groups, &addr, rs485_address_equals)) {
+				/* Address doesn't match */
+				return;
+			}
 			rx_package = (RS485_TRAVELLING_PACKAGE*) malloc(sizeof(RS485_TRAVELLING_PACKAGE));
 			if(!rx_package) {
 				last_error = ERR_DATA_ALLOC_FAILED;
@@ -298,8 +325,7 @@ void rs485_uart_address_received(uint8_t addr) {
 					rx_package->size = sizeof(RS485_HEADER);
 					rs485_status.receiving = 1;
 					rs485_status.header_rcvd = 0;
-					// TODO: Adjust
-					rx_timeout = 5; // Time before next byte should be received
+					rx_timeout = RS485_RX_TIMEOUT; // Time before next byte should be received
 				}
 			}
 			if(last_error != ERR_NONE) {
@@ -318,13 +344,11 @@ void rs485_uart_address_received(uint8_t addr) {
  * Called from UART, when one byte was received. The received byte is
  * put at the end of current rx package.
  */
-// TODO: Call from UART
 void rs485_uart_received(uint8_t byte) {
 	// Only accept if we currently expect to be receiving
 	if(rs485_status.receiving) {
 		if(rx_package) {
-			// TODO: Adjust value
-			rx_timeout = 5; // Time before next byte should be received
+			rx_timeout = RS485_RX_TIMEOUT; // Time before next byte should be received
 			rx_package->package->bytes[rx_package->position] = byte;
 			rx_package->position++;
 			if(rx_package->position >= rx_package->size) {
@@ -376,7 +400,7 @@ void rs485_send_byte() {
 	if(rs485_status.sending && tx_package) {
 		if(tx_package && rx_package->position < tx_package->size) {
 			/* Send the next byte */
-			rs485_uart_puts(rx_package->package->bytes[tx_package->position]);
+			rs485_uart_puts(rx_package->package->bytes[tx_package->position], rx_package->position == 0);
 			tx_package->position++;
 		} else {
 			/* Package was sent */
@@ -384,7 +408,7 @@ void rs485_send_byte() {
 				/* Wait for ack before finishing sending */
 				rs485_status.waiting_for_ack = 1;
 				rs485_wait_for_address();
-				rx_timeout = 50; // TODO: Adjust; Give the slave some ticks to answer
+				rx_timeout = RS485_ACK_TIMEOUT; // Give the slave some ticks to answer
 			} else {
 				/* We don't have to wait for ack */
 				rs485_status.last_send_result = 1;
@@ -398,7 +422,6 @@ void rs485_send_byte() {
  * Called when the UART finished sending a byte.
  */
 void rs485_uart_sent() {
-	// TODO: Has to be called from uart rx finished interrupt
 	rs485_send_byte();
 }
 
@@ -410,6 +433,7 @@ void rs485_uart_sent() {
  * Indicate that the UART should only receive address bytes.
  */
 void rs485_wait_for_address() {
+
 	rs485_status.addressed = 0;
 }
 
@@ -418,6 +442,7 @@ void rs485_wait_for_address() {
  * a packet.
  */
 void rs485_addressed() {
+
 	rs485_status.addressed = 1;
 }
 
@@ -476,10 +501,28 @@ void rs485_proccess(uint8_t ticks_passed) {
  *****/
 
 /*
- * Sets the bus address
+ * Add to group
  */
-void rs485_set_address(uint16_t addr) {
-	address = addr;
+uint8_t rs485_add_group(RS485_ADDRESS addr) {
+	if(!list_contains_data(groups, &addr, rs485_address_equals)) {
+		RS485_ADDRESS* address = (RS485_ADDRESS*) malloc(sizeof(RS485_ADDRESS));
+		if(address) {
+			if(list_add(groups, address)) {
+				return 1;
+			} else {
+				free(address);
+			}
+		}
+		return 0;
+	}
+	return 1;
+}
+
+/*
+ * Remove from group
+ */
+void rs485_remove_group(RS485_ADDRESS addr) {
+	list_remove_item(groups, list_item_for(groups, &addr, rs485_address_equals));
 }
 
 /*
@@ -492,6 +535,11 @@ void rs485_init() {
 	if(!rx_buffer) {
 		critical_error(ERR_BUFFER_ALLOC_FAILED);
 	}
+	groups = list_new();
+	if(!groups) {
+		critical_error(ERR_LIST_ALLOC_FAILED);
+	}
+	rs485_uart_init();
 }
 
 /*
@@ -554,4 +602,8 @@ void rs485_register_package_sent_cb(void (*cb)(void)) {
  */
 void rs485_register_error_cb(void (*cb)(uint8_t)) {
 	rs485_error_cb = cb;
+}
+
+uint8_t rs485_address_equals(void* a1, void* a2) {
+	return *((RS485_ADDRESS*)a1) == *((RS485_ADDRESS*)a2);
 }
