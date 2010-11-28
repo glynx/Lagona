@@ -15,20 +15,20 @@
 /*
  * Configuration
  */
-#define	RS485_MAX_TX_RETRIES					3
-#define RS485_RX_PACKAGE_BUFFER_SIZE			3
+#define	RS485_MAX_TX_RETRIES					3		/* Maximum number of retries when sending a packet */
+#define RS485_RX_PACKAGE_BUFFER_SIZE			3		/* Maximum number of received packages that can wait in the buffer */
 
 // USART interrupt vectors
 #define RS485_USART_RXIR			USART_RXC_vect
 #define RS485_USART_TXIR			USART_TXC_vect
 
 // USART registers used
-#define RS485_USART_UCSRA			defUCSRA
-#define RS485_USART_UCSRB			defUCSRB
-#define RS485_USART_UCSRC			defUCSRC
-#define RS485_USART_UDR				defUDR
-#define RS485_USART_UBBRH			defUBRRH
-#define RS485_USART_UBBRL			defUBRRL
+#define RS485_USART_UCSRA			defUCSRA	// Configuration register A
+#define RS485_USART_UCSRB			defUCSRB	// Configuration register B
+#define RS485_USART_UCSRC			defUCSRC	// Configuration register C
+#define RS485_USART_UDR				defUDR		// Data register
+#define RS485_USART_UBBRH			defUBRRH	// Baudrate register H
+#define RS485_USART_UBBRL			defUBRRL	// Baudrate register L
 
 // Register bit defines
 // UCSRA

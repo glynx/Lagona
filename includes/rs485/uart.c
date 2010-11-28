@@ -41,6 +41,9 @@ ISR(RS485_USART_TXIR) {
 	rs485_uart_sent();
 }
 
+/*
+ * Initialize the uart
+ */
 void rs485_uart_init() {
 	/* Setup baud rate, bus speed 0,5MBit/s */
 	RS485_USART_UBBRH = 0;
@@ -63,6 +66,9 @@ void rs485_uart_init() {
 	RS485_USART_UCSRB |= (1<<RS485_USART_RXEN) | (1<<RS485_USART_TXEN);
 }
 
+/*
+ * Write a byte to the bus
+ */
 void rs485_uart_puts(uint8_t byte, uint8_t addr) {
 	while(!(RS485_USART_UCSRA & (1<<RS485_USART_UDRE))) {};
 	if(addr) {
@@ -73,6 +79,9 @@ void rs485_uart_puts(uint8_t byte, uint8_t addr) {
 	RS485_USART_UDR = byte;
 }
 
+/*
+ * Set whether the UART should only listen to address bytes
+ */
 void rs485_uart_addressed(uint8_t b) {
 	if(b) {
 		/* Only receive address bytes */

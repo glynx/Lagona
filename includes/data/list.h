@@ -8,6 +8,9 @@
 #ifndef LIST_H_
 #define LIST_H_
 
+#include "../../conf/settings.h"
+
+#ifdef USE_DOUBLE_LINKED_LISTS
 #include <avr/io.h>
 
 struct list_item;
@@ -32,4 +35,5 @@ void list_remove(LIST* list, void* data, uint8_t (*equal)(void*,void*));
 uint8_t list_contains_data(LIST* list, void* data, uint8_t (*equal)(void*,void*));
 uint8_t list_add(LIST* list, void* data);
 
+#endif
 #endif /* LIST_H_ */

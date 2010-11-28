@@ -12,10 +12,13 @@
 #include "uart.h"
 #include "../../conf/errors.h"
 #include "../data/fifo.h"
-#include "../data/list.h"
+#ifdef USE_RS485_ADDRESS_GROUPS
+	#include "../data/list.h"
+#endif
 #include "../security/crc.h"
 #include "../security/rand.h"
 
+/* Current protocol status flags */
 typedef struct status {
 	uint8_t addressed:1;
 	uint8_t sending:1;
@@ -28,19 +31,23 @@ typedef struct status {
 } STATUS;
 STATUS rs485_status;
 
-FIFO* rx_buffer;			/* Buffer for received packages */
+FIFO* rx_buffer;							/* Buffer for received packages */
 
-uint8_t tx_delay = 0;		/* Ticks after which transmit is tried */
-uint8_t tx_retries = 0;		/* Number of retries current tx package already had */
-uint8_t rx_timeout = 0;		/* Ticks to wait until receiving package will be dropped */
+uint8_t tx_delay = 0;						/* Ticks after which transmit is tried */
+uint8_t tx_retries = 0;						/* Number of retries current tx package already had */
+uint8_t rx_timeout = 0;						/* Ticks to wait until receiving package will be dropped */
 
-uint8_t last_error = ERR_NONE;
+uint8_t last_error = ERR_NONE;				/* Last error that occured */
 
 RS485_TRAVELLING_PACKAGE* tx_package;		/* The currently sent package */
 RS485_TRAVELLING_PACKAGE* rx_package;		/* The currently received package */
 
-LIST* groups;
-RS485_ADDRESS address;
+RS485_ADDRESS address;						/* Bus main address */
+
+#ifdef USE_RS485_ADDRESS_GROUPS
+LIST* groups;								/* Additional addresses (used for grouping) */
+#endif
+
 // TODO: Address = broadcast address <=> receive all
 
 /*****
@@ -75,8 +82,10 @@ void rs485_wait_for_address();
 void rs485_addressed();
 void rs485_proccess(uint8_t ticks_passed);
 
+#ifdef USE_RS485_ADDRESS_GROUPS
 uint8_t rs485_add_group(RS485_ADDRESS addr);
 void rs485_remove_group(RS485_ADDRESS addr);
+#endif
 void rs485_init();
 uint8_t rs485_is_sending();
 uint8_t rs485_is_receiving();
@@ -307,9 +316,16 @@ void rs485_uart_address_received(uint8_t addr) {
 		if((!rs485_status.sending || rs485_status.waiting_for_ack) && !rs485_status.receiving) {
 			/* When we are waiting for a packet, either because we are idle or we
 			 * expect an ack, the address is the beginning of a new package to be received */
-			if(address != RS485_BROADCAST_ADDRESS && addr != address && !list_contains_data(groups, &addr, rs485_address_equals)) {
+			if(address != RS485_BROADCAST_ADDRESS && addr != address) {
+#ifdef USE_RS485_ADDRESS_GROUPS
+				if(!list_contains_data(groups, &addr, rs485_address_equals)) {
+					/* Address doesn't match */
+					return;
+				}
+#else
 				/* Address doesn't match */
 				return;
+#endif
 			}
 			rx_package = (RS485_TRAVELLING_PACKAGE*) malloc(sizeof(RS485_TRAVELLING_PACKAGE));
 			if(!rx_package) {
@@ -500,6 +516,7 @@ void rs485_proccess(uint8_t ticks_passed) {
  * Settings
  *****/
 
+#ifdef USE_RS485_ADDRESS_GROUPS
 /*
  * Add to group
  */
@@ -525,6 +542,8 @@ void rs485_remove_group(RS485_ADDRESS addr) {
 	list_remove_item(groups, list_item_for(groups, &addr, rs485_address_equals));
 }
 
+#endif
+
 /*
  * Initializes the rs485. Call this first.
  */
@@ -535,10 +554,12 @@ void rs485_init() {
 	if(!rx_buffer) {
 		critical_error(ERR_BUFFER_ALLOC_FAILED);
 	}
+#ifdef USE_RS485_ADDRESS_GROUPS
 	groups = list_new();
 	if(!groups) {
 		critical_error(ERR_LIST_ALLOC_FAILED);
 	}
+#endif
 	rs485_uart_init();
 }
 

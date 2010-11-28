@@ -8,6 +8,9 @@
 #include <avr/io.h>
 #include <stdlib.h>
 
+/*
+ * Create a seed that is generated from the whole heap
+ */
 unsigned short get_seed()
 {
    unsigned short seed = 0;
@@ -20,6 +23,9 @@ unsigned short get_seed()
    return seed;
 }
 
+/*
+ * Call this to initialize the random number generator
+ */
 void rand_init() {
 	srand(get_seed());
 }

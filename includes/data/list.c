@@ -5,8 +5,10 @@
  *      Author: sven
  */
 
-#include <stdlib.h>
 #include "list.h"
+
+#ifdef USE_RS485_ADDRESS_GROUPS
+#include <stdlib.h>
 
 LIST* list_new() {
 	LIST* list = (LIST*) calloc(1, sizeof(LIST));
@@ -55,21 +57,6 @@ uint8_t list_add(LIST* list, void* data) {
 	return 1;
 }
 
-/*uint8_t list_contains_helper(LIST_ITEM* item, void* data) {
-	if(item) {
-		if(item->element == data) {
-			return 1;
-		}
-		return list_contains_helper(item->next, data);
-	} else {
-		return 0;
-	}
-}
-
-uint8_t list_contains(LIST* list, void* data) {
-	return list_contains_helper(list->head, data);
-}*/
-
 uint8_t list_contains_data(LIST* list, void* data, uint8_t (*equal)(void*,void*)) {
 	return (list_item_for(list, data, equal) != NULL);
 }
@@ -88,3 +75,5 @@ LIST_ITEM* list_item_for_helper(LIST_ITEM* item, void* data, uint8_t (*equal)(vo
 LIST_ITEM* list_item_for(LIST* list, void* data, uint8_t (*equal)(void*,void*)) {
 	return list_item_for_helper(list->head, data, equal);
 }
+
+#endif
