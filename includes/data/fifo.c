@@ -31,17 +31,15 @@ void* fifo_next(FIFO* fifo) {
 	if (fifo->count > 0) {
 		e = fifo->data[fifo->pos];
 		fifo->pos++;
+		fifo->pos %= fifo->size;
 		fifo->count--;
-		if (fifo->pos >= fifo->size) {
-			fifo->pos = 0;
-		}
 	}
 	return e;
 }
 
 uint8_t fifo_add(FIFO* fifo, void* element) {
 	if (fifo->count < fifo->size) {
-		fifo->data[fifo->pos + fifo->size] = element;
+		fifo->data[(fifo->pos + fifo->count) % fifo->size] = element;
 		fifo->count++;
 		return ERR_NONE;
 	} else {

@@ -18,9 +18,15 @@
 #define	RS485_MAX_TX_RETRIES					3		/* Maximum number of retries when sending a packet */
 #define RS485_RX_PACKAGE_BUFFER_SIZE			3		/* Maximum number of received packages that can wait in the buffer */
 
+// USART driver enable pin
+#define RS485_USART_DE_DDR			DDRB
+#define	RS485_USART_DE_PORT			PORTB
+#define RS485_USART_DE_PIN			PB0
+
 // USART interrupt vectors
 #define RS485_USART_RXIR			USART_RXC_vect
 #define RS485_USART_TXIR			USART_TXC_vect
+#define RS485_USART_UDRIR			USART_UDRE_vect
 
 // USART registers used
 #define RS485_USART_UCSRA			defUCSRA	// Configuration register A
@@ -42,6 +48,7 @@
 // UCSRB
 #define RS485_USART_RXCIE					defRXCIE	// RX interrupt enable
 #define RS485_USART_TXCIE					defTXCIE	// TX interrupt enable
+#define RS485_USART_UDRIE					defUDRIE	// UDR empty interrupt enable
 #define RS485_USART_TXEN					defTXEN		// TX enable
 #define RS485_USART_RXEN					defRXEN		// RX enable
 #define RS485_USART_TXB8					defTXB8		// TX ninth bit

@@ -62,6 +62,7 @@
 #define defRXEN RXEN		//Default RX enable
 #define defTXEN TXEN  	//Default TX enable
 #define defRXCIE RXCIE 	//Default RX interrupt enable
+#define defUDRIE UDRIE	// UDR empty interrupt enable
 #define defUCSRB UCSRB		//Default Uart Status Register B
 #define defUCSRC UCSRC		//Default Uart Status Register C
 #define defURSEL URSEL	//Default Register Select
@@ -97,15 +98,12 @@
 #define defCS1		CS11	//Default Counter divider Bit1
 #define defCS2		CS12	//Default Counter divider Bit2
 #define defWGM1		WGM01	//Default Waveform Generator mode bit 2
-#define defOCR		OCR1A	//Default Overflow Controll Register High
+#define defOCR		OCR1A	//Default on compare value register
 #define defCOM1		COM01
-//#define defOCRL		OCR1AL	//Default Overflow Controll Register LOW
 #define defTIMSK	TIMSK	//Default Timercounter Interrupt Mask  
-#define defOCIE		OCIE1A	//Default Enable Counter Overflow bit
+#define defOCIE		OCIE1A	//Default Enable Counter Compare interrupt bit
 #define defTIMEVEC	TIMER1_COMPA_vect //Default Time/Clock Vektor
-
-
-
+#define defCTCBit	WGM12
 
 
 //##################################### ATMEGA 16 #############################################

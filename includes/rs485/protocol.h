@@ -12,7 +12,9 @@
 #ifndef PROTOCOL_H_
 #define PROTOCOL_H_
 
+#ifndef SERVER
 #include <avr/io.h>
+#endif
 #include "../../conf/settings.h"
 
 /*
@@ -70,20 +72,20 @@ typedef struct rs485_body {
 	uint16_t checksum;
 } RS485_BODY;
 
-struct rs485_package {
-	RS485_HEADER header;
-	RS485_BODY body;
-};
+typedef struct rs485_package {
+	RS485_HEADER* header;
+	RS485_BODY* body;
+} RS485_PACKAGE;
 
-typedef union rs485_package_union {
+/*typedef union rs485_package_union {
 	struct rs485_package package;
 	uint8_t* bytes;
-} RS485_PACKAGE;
+} RS485_PACKAGE;*/
 
 typedef struct rs485_travelling_package {
 	RS485_PACKAGE* package;
-	uint8_t position;
-	uint8_t size;
+	volatile uint8_t position;
+	volatile uint8_t size;
 } RS485_TRAVELLING_PACKAGE;
 
 /*
@@ -93,12 +95,25 @@ uint8_t rs485_address_equals(void* a1, void* a2);
 
 /* External rs485 functionality */
 void rs485_init();
+void rs485_send_package(RS485_PACKAGE* package);
+uint8_t rs485_is_ready_to_send();
+uint8_t rs485_is_sending();
+uint8_t rs485_is_receiving();
+uint8_t rs485_is_package_waiting();
+RS485_PACKAGE* rs485_new_package(uint8_t data_length);
+RS485_PACKAGE* rs485_next_package();
+void rs485_set_address(RS485_ADDRESS addr);
+void rs485_process(uint8_t ticks_passed);
+void rs485_free_package(RS485_PACKAGE* package);
 
 /* UART callbacks */
 void rs485_uart_receive_error(uint8_t error);
 void rs485_uart_address_received(uint8_t addr);
 void rs485_uart_received(uint8_t byte);
 void rs485_uart_sent();
+
+/* Callbacks */
+void rs485_register_package_received_cb(void (*cb)());
 
 /*
  * Do not modify from here
