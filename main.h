@@ -5,10 +5,6 @@
 
 //Einstellungen
 
-/* Length of a tick in us */
-#define SYSTEM_TICK_LENGTH	100; // 0.1 ms
-
-
 //funktionen
 #define uart 0
 #define rgb 0

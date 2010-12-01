@@ -48,7 +48,7 @@ struct rs485_flags {
 	uint8_t ack_req:1;
 	uint8_t ack:1;
 	uint8_t nack:1;
-	uint8_t flag4:1;
+	uint8_t nocrc:1;
 	uint8_t flag5:1;
 	uint8_t flag6:1;
 	uint8_t flag7:1;
@@ -77,14 +77,10 @@ typedef struct rs485_package {
 	RS485_BODY* body;
 } RS485_PACKAGE;
 
-/*typedef union rs485_package_union {
-	struct rs485_package package;
-	uint8_t* bytes;
-} RS485_PACKAGE;*/
-
 typedef struct rs485_travelling_package {
-	RS485_PACKAGE* package;
+	uint8_t* package;
 	volatile uint8_t position;
+	volatile uint8_t check_position;
 	volatile uint8_t size;
 } RS485_TRAVELLING_PACKAGE;
 

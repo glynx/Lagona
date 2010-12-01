@@ -20,6 +20,9 @@
 
 FIFO* tx_fifo;
 
+uint8_t addressed = 0;
+volatile uint8_t transmitting = 0;
+
 void rs485_uart_puts(uint8_t byte, uint8_t addr);
 
 void rs485_uart_drive(uint8_t d) {
@@ -48,14 +51,15 @@ ISR(RS485_USART_RXIR) {
 
 	uint8_t byte = RS485_USART_UDR;
 	// TODO: Reimplement mpc
-	//if(RS485_USART_UCSRB & (1<<RS485_USART_RXB8)) {
+	//if(addressed) {
 		/* Address byte */
 	//	rs485_uart_address_received(byte);
 	//} else {
 		/* Data byte */
 	//	rs485_uart_received(byte);
 	//}
-	if(rs485_is_receiving() || rs485_is_sending()) {
+
+	if(addressed) {
 		rs485_uart_received(byte);
 	} else {
 		rs485_uart_address_received(byte);
@@ -63,19 +67,14 @@ ISR(RS485_USART_RXIR) {
 }
 
 ISR(RS485_USART_TXIR) {
+	transmitting = 0;
 	if(!rs485_is_sending()) {
 		rs485_uart_drive(0);
 	}
-	RS485_USART_UCSRB |= (1<<RS485_USART_RXEN);
 }
 
 /* Interrupt: UDR empty, transmit next */
 ISR(RS485_USART_UDRIR) {
-	/*PORTC &= ~(1<<PC5);
-	_delay_ms(1);
-	PORTC |= (1<<PC5);
-	_delay_ms(1);*/
-	//_delay_ms(1);
 	rs485_uart_sent();
 }
 
@@ -99,8 +98,8 @@ void rs485_uart_init() {
 	RS485_USART_UCSRB |= (1<<RS485_USART_RXCIE);
 	//RS485_USART_UCSRB |= (1<<RS485_USART_TXCIE);
 	/* Enable receiver and transmitter */
-	//RS485_USART_UCSRB |= (1<<RS485_USART_RXEN) | (1<<RS485_USART_TXEN);
-	RS485_USART_UCSRB |= (1<<RS485_USART_TXEN);
+	RS485_USART_UCSRB |= (1<<RS485_USART_RXEN) | (1<<RS485_USART_TXEN);
+	//RS485_USART_UCSRB |= (1<<RS485_USART_TXEN);
 	/* Setup baud rate, bus speed 0,5MBit/s */
 	UBRRH = UBRRH_VALUE;
 	UBRRL = UBRRL_VALUE;
@@ -123,11 +122,14 @@ void rs485_uart_puts(uint8_t byte, uint8_t addr) {
 	} else {
 		RS485_USART_UCSRB &= ~(1<<RS485_USART_TXB8);
 	}*/
-
-	//rs485_uart_drive(1);
 	RS485_USART_UDR = byte;
+	transmitting = 1;
 }
 
+/*
+ * Enables the transceiver. After calling this, at least one byte has to be
+ * transmitted before the transmission is stopped again.
+ */
 void rs485_uart_start_transmission() {
 	rs485_uart_drive(1);
 	PORTC |= (1<<PC5);
@@ -135,6 +137,9 @@ void rs485_uart_start_transmission() {
 }
 
 void rs485_uart_stop_transmission() {
+	if(!transmitting) {
+		rs485_uart_drive(0);
+	}
 	PORTC &= ~(1<<PC5);
 	RS485_USART_UCSRB &= ~(1<<RS485_USART_UDRIE);
 }
@@ -143,11 +148,12 @@ void rs485_uart_stop_transmission() {
  * Set whether the UART should only listen to address bytes
  */
 void rs485_uart_addressed(uint8_t b) {
+	addressed = b;
 	if(b) {
 		/* Only receive address bytes */
-		//RS485_USART_UCSRA |= (1<<RS485_USART_MPCM);
+		//RS485_USART_UCSRA &= ~(1<<RS485_USART_MPCM);
 	} else {
 		/* Receive all bytes (data bytes) */
-		//RS485_USART_UCSRA &= ~(1<<RS485_USART_MPCM);
+		//RS485_USART_UCSRA |= (1<<RS485_USART_MPCM);
 	}
 }

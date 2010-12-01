@@ -102,7 +102,9 @@
 #define defCOM1		COM01
 #define defTIMSK	TIMSK	//Default Timercounter Interrupt Mask  
 #define defOCIE		OCIE1A	//Default Enable Counter Compare interrupt bit
-#define defTIMEVEC	TIMER1_COMPA_vect //Default Time/Clock Vektor
+#define defTIMEVEC	TIMER1_COMPA_vect //Default Time/Clock vector
+#define defOVFLVEC	TIMER1_OVF_vect // Default Time/Clock overflow vector
+#define defTIME		TCNT1	// Default Time/Clock value
 #define defCTCBit	WGM12
 
 

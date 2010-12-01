@@ -22,6 +22,13 @@
  */
 
 /* Length of a tick in us */
-#define SYSTEM_TICK_LENGTH	100U; // 0.1 ms
+#define SYSTEM_TICK_LENGTH	100U // 0.1 ms
+
+/* Use system timer in interrupt mode? */
+/*
+ * 		Interrupt mode interrupts every system tick to increase counter value.
+ * 		Non-interrupt (or polling) mode calculates counter value only when asked.
+ */
+#define TIMER_INTERRUPT_MODE 0
 
 #endif /* SETTINGS_H_ */

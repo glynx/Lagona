@@ -6,6 +6,7 @@
  */
 
 #include <stdlib.h>
+#include <string.h>
 #include "../../main.h"
 #include "protocol.h"
 #include "rs485.h"
@@ -36,12 +37,10 @@ volatile STATUS rs485_status;
 volatile FIFO* rx_buffer;							/* Buffer for received packages */
 
 volatile uint8_t tx_delay = 0;						/* Ticks after which transmit is tried */
-volatile uint8_t tx_retries = 0;						/* Number of retries current tx package already had */
-volatile uint8_t rx_timeout = 0;						/* Ticks to wait until receiving package will be dropped */
+volatile uint8_t tx_retries = 0;					/* Number of retries current tx package already had */
+volatile uint8_t rx_timeout = 0;					/* Ticks to wait until receiving package will be dropped */
 
 volatile uint8_t last_error = ERR_NONE;				/* Last error that occured */
-
-volatile uint8_t last_byte = 0x00;
 
 volatile RS485_TRAVELLING_PACKAGE* tx_package;		/* The currently sent package */
 volatile RS485_TRAVELLING_PACKAGE* rx_package;		/* The currently received package */
@@ -99,8 +98,6 @@ void rs485_register_package_received_cb(void (*cb)(void));
 void rs485_register_package_sent_cb(void (*cb)(void));
 void rs485_register_error_cb(void (*cb)(uint8_t));
 
-//uint8_t* toSend;
-
 // TODO: Before sending, check if the bus is busy
 
 /*****
@@ -110,9 +107,7 @@ void rs485_register_error_cb(void (*cb)(uint8_t));
 void rs485_stop_sending() {
 	rs485_status.sending = 0;
 	rs485_status.package_sent = 1;
-	rs485_free_package((RS485_PACKAGE*)(tx_package->package));
-	//free(toSend);
-	//toSend = NULL;
+	free(tx_package->package);
 	tx_package->package = NULL;
 	rs485_uart_stop_transmission();
 	rs485_wait_for_address();
@@ -146,27 +141,29 @@ void rs485_postpone_sending(uint8_t ticks) {
 			}
 		}
 	}
+	rs485_uart_stop_transmission(); // Stop driver
 	rs485_wait_for_address();
 }
 
 void rs485_stop_receiving() {
 	rs485_status.receiving = 0;
-	rs485_free_package((RS485_PACKAGE*)(rx_package->package));
+	free(rx_package->package);
 	rx_package->package = NULL;
 	rs485_wait_for_address();
 }
 
 void rs485_cancel_receiving() {
 	if(rs485_status.receiving && rs485_status.header_rcvd) {
-		if(rx_package->package->header->flags.flags.ack_req) {
+		// Header has been received
+		RS485_PACKAGE* pck = (RS485_PACKAGE*)rx_package->package;
+		if(pck->header->flags.flags.ack_req) {
+			uint8_t origin = pck->header->origin;
 			rs485_stop_receiving();
-			rs485_send_ack(rx_package->package->header->origin, 0);
-		} else {
-			rs485_stop_receiving();
+			rs485_send_ack(origin, 0);
+			return;
 		}
-	} else {
-		rs485_stop_receiving();
 	}
+	rs485_stop_receiving();
 }
 
 /*****
@@ -179,36 +176,29 @@ void rs485_cancel_receiving() {
  */
 void rs485_send_package(RS485_PACKAGE* package) {
 	while(rs485_status.receiving || rs485_status.sending) {	};
-	if(tx_package) {
-		tx_package->package = package;
-		tx_package->position = 0;
-		/* Size is header size + data size and 2 if data length != 0*/
-		tx_package->size = sizeof(RS485_HEADER);
-		if(package->header->length) {
-			 tx_package->size += 2 + package->header->length;
+	tx_package->position = 0;
+	/* Size is header size + data size and 2 if data length != 0*/
+	uint8_t size_header = sizeof(RS485_HEADER);
+	uint8_t size_pck = package->header->length;
+	tx_package->size = size_header;
+	if(size_pck) {
+		 tx_package->size += 2 + size_pck;
 #ifdef USE_RS485_CRC_CHECKSUM
-			 package->body->checksum = crc_calculate_bytes(package->body->data, package->header->length, RS485_CRC16_START, RS485_CRC16_POLY);
+		 package->body->checksum = crc_calculate_bytes(package->body->data, size_pck, RS485_CRC16_START, RS485_CRC16_POLY);
 #else
-#warning	Clients with CRC checksum disabled may only send packages without data
-			 critical_error(ERR_SEND_WITHOUT_CHECKSUM);
+		 package->header->flags.flags.nocrc = 1;
 #endif
-		}
-		/*toSend = (uint8_t*) malloc(tx_package->size);
-		memcpy(toSend, tx_package->package->header, sizeof(RS485_HEADER));
-		memcpy(toSend + sizeof(RS485_HEADER), package->body->data, package->header->length);
-		memcpy(toSend + sizeof(RS485_HEADER) + package->header->length, &package->body->checksum, 2);
-		*/
-		rs485_status.sending = 1;
-		tx_delay = 0;
-		tx_retries = 0;
-		rs485_addressed();
-		rs485_uart_start_transmission();
-	} else {
-		/* Allocation error */
-		last_error = ERR_DATA_ALLOC_FAILED;
-		rs485_status.last_send_result = 0;
-		rs485_stop_sending();
 	}
+	uint8_t* pck = (uint8_t*) malloc(tx_package->size);
+	tx_package->package = pck;
+	memcpy(pck, package->header, size_header);
+	memcpy(pck += size_header, package->body->data, size_pck);
+	memcpy(pck += size_pck, &package->body->checksum, 2);
+	rs485_status.sending = 1;
+	tx_delay = 0;
+	tx_retries = 0;
+	rs485_addressed();
+	rs485_uart_start_transmission();
 }
 
 /*
@@ -220,7 +210,7 @@ void rs485_received_ack(uint8_t ack, uint16_t origin) {
 		rs485_status.last_send_result = 1;
 		rs485_stop_sending();
 	} else {
-		/* Packet was not received properly */
+		/* Packet was not received properly, resend immediately */
 		rs485_postpone_sending(0xFF);
 	}
 }
@@ -243,7 +233,7 @@ void rs485_package_received(RS485_PACKAGE* package) {
 
 	if(!handled) {
 #ifdef USE_RS485_CRC_CHECKSUM
-		if(package->header->length) {
+		if(!package->header->length && package->header->flags.flags.nocrc) {
 			uint16_t crc;
 			crc = crc_calculate_bytes(package->body->data, package->header->length, RS485_CRC16_START, RS485_CRC16_POLY);
 			if(crc != package->body->checksum) {
@@ -274,17 +264,13 @@ void rs485_package_received(RS485_PACKAGE* package) {
 }
 
 /*
- * Free memory for the travelling rxtx and underlying rs485 package
+ * Free memory for the rs485 package
  */
 void rs485_free_package(RS485_PACKAGE* package) {
 	if(package) {
-		if(package->header) {
-			free(package->header);
-		}
+		free(package->header);
 		if(package->body) {
-			if(package->body->data) {
-				free(package->body->data);
-			}
+			free(package->body->data);
 			free(package->body);
 		}
 		free(package);
@@ -335,51 +321,42 @@ void rs485_uart_receive_error(uint8_t error) {
  * UART. This should indicate the beginning of a new incoming transmission.
  */
 void rs485_uart_address_received(uint8_t addr) {
-	if(rs485_status.sending && !rs485_status.waiting_for_ack) {
-		/* When we are sending and not waiting for ack, the received address
-		 * simply is the one we just send. So treat it as usual byte. */
-		rs485_uart_received(addr);
-	} else {
-		if((!rs485_status.sending || rs485_status.waiting_for_ack) && !rs485_status.receiving) {
-			/* When we are waiting for a packet, either because we are idle or we
-			 * expect an ack, the address is the beginning of a new package to be received */
-			if(address != RS485_BROADCAST_ADDRESS && addr != address) {
+	if((!rs485_status.sending || rs485_status.waiting_for_ack) && !rs485_status.receiving) {
+		/* When we are waiting for a packet, either because we are idle or we
+		 * expect an ack, the address is the beginning of a new package to be received */
+		if(address != RS485_BROADCAST_ADDRESS && addr != address) {
 #ifdef USE_RS485_ADDRESS_GROUPS
-				if(!list_contains_data(groups, &addr, rs485_address_equals)) {
-					/* Address doesn't match */
-					return;
-				}
-#else
+			if(!list_contains_data(groups, &addr, rs485_address_equals)) {
 				/* Address doesn't match */
 				return;
+			}
+#else
+			/* Address doesn't match */
+			return;
 #endif
-			}
-			//rx_package = (RS485_TRAVELLING_PACKAGE*) calloc(1, sizeof(RS485_TRAVELLING_PACKAGE));
-			//if(!rx_package) {
-			//	last_error = ERR_DATA_ALLOC_FAILED;
-			//}
-			//if(last_error == ERR_NONE) {
-				rx_package->package = rs485_new_package(0);
-				if(!rx_package->package) {
-					last_error = ERR_DATA_ALLOC_FAILED;
-				}
-				if(last_error == ERR_NONE) {
-					rx_package->position = 1;
-					rx_package->package->header->destination = addr;
-					rx_package->size = sizeof(RS485_HEADER);
-					rs485_status.receiving = 1;
-					rs485_status.header_rcvd = 0;
-					rx_timeout = RS485_RX_TIMEOUT; // Time before next byte should be received
-				}
-			//}
-			if(last_error != ERR_NONE) {
-				rs485_cancel_receiving();
-			}
+		}
+		/* Prepare package to be received */
+		rx_package->package = (uint8_t*) malloc(sizeof(RS485_HEADER));
+		if(!rx_package->package) {
+			last_error = ERR_DATA_ALLOC_FAILED;
+		}
+		if(last_error == ERR_NONE) {
+			rx_package->position = 1;
+			rx_package->package[0] = addr;
+			rx_package->size = sizeof(RS485_HEADER);
+			rs485_status.receiving = 1;
+			rs485_status.header_rcvd = 0;
+			rx_timeout = RS485_RX_TIMEOUT; // Time before next byte should be received
 		} else {
-			/* We received an address while already receiving, this is an error condition */
-			if(rs485_status.receiving) {
-				rs485_cancel_receiving();
-			}
+			rs485_cancel_receiving();
+		}
+	} else {
+		/* We received an address while sending or receiving, this is an error condition */
+		if(rs485_status.receiving) {
+			rs485_cancel_receiving();
+		}
+		if(rs485_status.sending) {
+			rs485_postpone_sending(0xFF);
 		}
 	}
 }
@@ -391,61 +368,60 @@ void rs485_uart_address_received(uint8_t addr) {
 void rs485_uart_received(uint8_t byte) {
 	// Only accept if we currently expect to be receiving
 	if(rs485_status.receiving) {
-		if(rx_package) {
-			rx_timeout = RS485_RX_TIMEOUT; // Time before next byte should be received
-			if(rx_package->position < sizeof(RS485_HEADER)) {
-				/* Receiving header */
-				((uint8_t*)rx_package->package->header)[rx_package->position] = byte;
-			} else if(rx_package->position < sizeof(RS485_HEADER) + rx_package->package->header->length) {
-				/* Receiving data */
-				rx_package->package->body->data[rx_package->position - sizeof(RS485_HEADER)] = byte;
+		rx_timeout = RS485_RX_TIMEOUT; // Time before next byte should be received
+		rx_package->package[rx_package->position] = byte;
+		rx_package->position++;
+		if(rx_package->position >= rx_package->size) {
+			uint8_t finished = 0;
+			if(rs485_status.header_rcvd) {
+				/* Package received completely */
+				finished = 1;
 			} else {
-				/* Receiving checksum */
-				((uint8_t*)&(rx_package->package->body->checksum))[rx_package->position - sizeof(RS485_HEADER) - rx_package->package->header->length] = byte;
-			}
-			rx_package->position++;
-			if(rx_package->position >= rx_package->size) {
-				if(rs485_status.header_rcvd) {
-					/* Package received completely */
-					rs485_status.receiving = 0;
-					rs485_wait_for_address();
-					rs485_package_received(rx_package->package);
-					//free((RS485_TRAVELLING_PACKAGE*)rx_package); //NOTE: Only free rx package, not the rs485 package
-					//rx_package = NULL;
-				} else {
-					/* Header complete, evaluate it */
-					rs485_status.header_rcvd = 1;
-					/* Read length and prepare to receive body */
-					uint8_t length = rx_package->package->header->length;
-					if(length) {
-						/* Receive another 'length' bytes + checksum */
-						rx_package->package->body->data = (uint8_t*) malloc(length);
-						if(rx_package->package->body->data) {
-							rx_package->size += length + 2;
-						} else {
-							/* Allocation fault */
-							last_error = ERR_DATA_ALLOC_FAILED;
-							rs485_cancel_receiving();
-						}
+				/* Header complete, evaluate it */
+				rs485_status.header_rcvd = 1;
+				/* Read length and prepare to receive body */
+				uint8_t length = rx_package->package[3];
+				if(length) {
+					/* Receive another 'length' bytes + checksum */
+					rx_package->package = realloc(rx_package->package, sizeof(RS485_HEADER) + length + 2);
+					if(rx_package->package) {
+						rx_package->size += length + 2;
 					} else {
-						/* Package received completely */
-						rs485_status.receiving = 0;
-						rs485_wait_for_address();
-						rs485_package_received(rx_package->package);
-						//free((RS485_TRAVELLING_PACKAGE*)rx_package); //NOTE: Only free rxtx package, not the rs485 package
-						//rx_package = NULL;
+						/* Allocation fault */
+						last_error = ERR_DATA_ALLOC_FAILED;
+						rs485_cancel_receiving();
 					}
+				} else {
+					/* Package received completely */
+					finished = 1;
+				}
+			}
+			if(finished) {
+				rs485_status.receiving = 0;
+				rs485_wait_for_address();
+				uint8_t size_data = rx_package->package[3];
+				uint8_t size = sizeof(RS485_HEADER);
+				RS485_PACKAGE* pck = rs485_new_package(size_data);
+				if(pck) {
+					memcpy(pck->header, rx_package->package, size);
+					memcpy(pck->body->data, rx_package->package += sizeof(RS485_HEADER), size_data);
+					memcpy(&pck->body->checksum, rx_package->package += size_data, 2);
+					rs485_stop_receiving();
+					rs485_package_received(pck);
+				} else {
+					last_error = ERR_DATA_ALLOC_FAILED;
+					rs485_cancel_receiving();
 				}
 			}
 		}
-	}
-	if(rs485_status.sending) {
+	} else if(rs485_status.sending) {
 		/* Received our own byte, check it against what we thought we sent */
-		if(byte != last_byte) {
-			// TODO: Correct this
-			//critical_error(5);
-			//rs485_postpone_sending(0xFF); // Try to re-send later
+		if(byte != tx_package->package[tx_package->check_position]) {
+			// TODO: Remove debug crit
+			critical_error(5);
+			rs485_postpone_sending(0xFF); // Try to re-send later
 		}
+		tx_package->check_position++;
 	}
 }
 
@@ -454,20 +430,14 @@ void rs485_uart_received(uint8_t byte) {
  * only be called after the UART signaled ready.
  */
 void rs485_send_byte() {
-	if(tx_package->package && (tx_package->position < tx_package->size)) {
+	if(tx_package->position < tx_package->size) {
 		/* Send the next byte */
-		if(tx_package->position < sizeof(RS485_HEADER)) {
-			last_byte = ((uint8_t*)tx_package->package->header)[tx_package->position];
-		} else if(tx_package->position < sizeof(RS485_HEADER) + tx_package->package->header->length) {
-			last_byte = tx_package->package->body->data[tx_package->position - sizeof(RS485_HEADER)];
-		} else {
-			last_byte = ((uint8_t*)&(tx_package->package->body->checksum))[tx_package->position - sizeof(RS485_HEADER) - tx_package->package->header->length];
-		}
-		rs485_uart_puts(last_byte, tx_package->position == 0);
+		rs485_uart_puts(tx_package->package[tx_package->position], tx_package->position == 0);
 		tx_package->position++;
 	} else {
 		/* Package was sent */
-		if(tx_package->package->header->flags.flags.ack_req == 1) {
+		if(
+			((RS485_FLAGS*)(tx_package->package + 2))->flags.ack_req == 1) {
 			/* Wait for ack before finishing sending */
 			rs485_status.waiting_for_ack = 1;
 			rs485_wait_for_address();
@@ -495,7 +465,6 @@ void rs485_uart_sent() {
  * Indicate that the UART should only receive address bytes.
  */
 void rs485_wait_for_address() {
-
 	rs485_status.addressed = 0;
 }
 
@@ -504,7 +473,6 @@ void rs485_wait_for_address() {
  * a packet.
  */
 void rs485_addressed() {
-
 	rs485_status.addressed = 1;
 }
 
